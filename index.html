@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asistencia 750</title>
+    <title>Asistencia Dinámica</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
     <style>
         :root { --primary: #1a73e8; --bg: #f0f2f5; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
         .card { background: white; padding: 24px; border-radius: 16px; width: 100%; max-width: 340px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
         h2 { text-align: center; color: #1e293b; margin: 0 0 20px 0; font-weight: 700; }
         label { display: block; margin-bottom: 5px; font-size: 12px; color: #64748b; font-weight: 600; }
-        input, select, button { width: 100%; padding: 14px; margin-bottom: 16px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; font-size: 16px; background: #f8fafc; }
-        input:focus, select:focus { outline: none; border-color: var(--primary); background: #fff; }
-        button { background: var(--primary); color: white; font-weight: bold; border: none; cursor: pointer; margin-bottom: 0; margin-top: 4px; transition: background 0.2s; }
+        select, button { width: 100%; padding: 14px; margin-bottom: 16px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; font-size: 16px; background: #f8fafc; }
+        select:focus { outline: none; border-color: var(--primary); background: #fff; }
+        button { background: var(--primary); color: white; font-weight: bold; border: none; cursor: pointer; margin-top: 4px; }
         button:disabled { background: #94a3b8; cursor: not-allowed; }
         #status { text-align: center; font-weight: 600; margin-top: 15px; font-size: 14px; color: #475569; padding: 8px; border-radius: 6px; display: none; }
     </style>
@@ -23,103 +23,143 @@
 <div class="card">
     <h2>Asistencia</h2>
     <form id="asistenciaForm">
-        <label>ESTUDIANTE</label>
-        <input type="text" id="nombre" placeholder="Apellido y Nombre" required>
-        <input type="number" id="dni" placeholder="Número de DNI" required>
+        <label>1. SELECCIONÁ TU CURSO</label>
+        <select id="curso" required>
+            <option value="" disabled selected>Elegí tu curso...</option>
+            <option value="5° 2°">5° 2°</option>
+            <option value="6° 2°">6° 2°</option>
+            <option value="4° 1°">4° 1°</option>
+            <option value="4° 2°">4° 2°</option>
+        </select>
+
+        <label>2. APELLIDO Y NOMBRE</label>
+        <select id="estudiante" disabled required>
+            <option value="" disabled selected>Primero elegí el curso...</option>
+        </select>
         
-        <label>ESTADO</label>
+        <label>3. ESTADO</label>
         <select id="estado">
             <option value="Presente">Presente</option>
             <option value="Ausente">Ausente</option>
         </select>
         
-        <button type="submit" id="btnEnviar">Enviar Registro</button>
+        <button type="submit" id="btnEnviar" disabled>Enviar Registro</button>
     </form>
     <div id="status"></div>
 </div>
 
 <script>
     // =================================================================
-    // REVISA Y REEMPLAZA ESTOS DATOS EXACTAMENTE COMO EN TU PYTHON:
+    // REEMPLAZÁ ACÁ LAS LISTAS DE ALUMNOS CON TUS CURSOS REALES:
     // =================================================================
-    const broker = "d7c00be048ac4f408cd656bbb25ac141.s1.eu.hivemq.cloud"; // REEMPLAZAR (Sin 'https://' ni '/' al final)
-    const usuario = "COLEGIO750";                             // REEMPLAZAR
-    const contrasena = "Presente26";                   // REEMPLAZAR
-    const topico = "colegio/asistencia/unica";             // Debe ser idéntico al de Python
-    // =================================================================
+    const baseDatosCursos = {
+        "5° 2°": [
+            { nombre: "Pérez Juan", dni: "12345678" },
+            { nombre: "García María", dni: "87654321" }
+        ],
+        "6° 2°": [
+            { nombre: "Ramírez Rigoberto", dni: "23498784" },
+            { nombre: "Rey Patricio", dni: "24897984" }
+        ],
+        "4° 1°": [
+            { nombre: "Fernández Luis", dni: "33445566" }
+        ],
+        "4° 2°": [
+            { nombre: "López Ana", dni: "44556677" }
+        ]
+    };
 
-    // En HiveMQ Cloud, para conexiones Web desde el navegador, el puerto SIEMPRE es 8884
+    // DATOS DE TU CONEXIÓN HIVEMQ CLOUD (Mantenelos igual)
+    const broker = "d7c00be048ac4f408cd656bbb25ac141.s1.eu.hivemq.cloud"; 
+    const usuario = "COLEGIO750";                             
+    const contrasena = "Presente26";                   
+    const topico = "colegio/asistencia/unica";             
     const puerto = 8884; 
-    const clientId = "web_" + Math.random().toString(16).substr(2, 8);
+    // =================================================================
 
-    const client = new Paho.MQTT.Client(broker, Number(puerto), clientId);
-    const statusDiv = document.getElementById("status");
+    const client = new Paho.MQTT.Client(broker, Number(puerto), "web_" + Math.random().toString(16).substr(2, 8));
+    const selectCurso = document.getElementById("curso");
+    const selectEstudiante = document.getElementById("estudiante");
     const btn = document.getElementById("btnEnviar");
+    const statusDiv = document.getElementById("status");
+
+    // LÓGICA EN CASCADA: Al cambiar el curso, se actualizan los estudiantes
+    selectCurso.onchange = function() {
+        const cursoSeleccionado = selectCurso.value;
+        const alumnos = baseDatosCursos[cursoSeleccionado] || [];
+        
+        // Limpiar el selector de estudiantes
+        selectEstudiante.innerHTML = '<option value="" disabled selected>Seleccioná tu nombre...</option>';
+        
+        // Cargar los alumnos del curso elegido
+        alumnos.forEach((alumno, indice) => {
+            let opt = document.createElement("option");
+            opt.value = indice; // Guardamos el índice para buscar el DNI después
+            opt.innerText = alumno.nombre;
+            selectEstudiante.appendChild(opt);
+        });
+        
+        // Activar el selector de estudiantes y el botón
+        selectEstudiante.disabled = false;
+        btn.disabled = false;
+    };
 
     document.getElementById("asistenciaForm").onsubmit = function(e) {
         e.preventDefault();
-        
-        // Bloquear interfaz para evitar doble envío
         btn.disabled = true;
         btn.innerText = "Conectando...";
         statusDiv.style.display = "block";
-        statusDiv.innerText = "Estableciendo conexión segura...";
-        statusDiv.style.background = "#fef3c7";
-        statusDiv.style.color = "#d97706";
+        statusDiv.innerText = "Conectando al servidor veloz...";
 
-        // Parámetros obligatorios de conexión para HiveMQ Cloud
-        const opcionesConexion = {
+        client.connect({
             userName: usuario,
             password: contrasena,
-            useSSL: true, // Obligatorio para el puerto 8884
-            timeout: 7,   // Tiempo límite para dar error si la red es pésima
+            useSSL: true,
+            timeout: 7,
             onSuccess: onConnect,
             onFailure: function(err) {
-                console.error("Detalles del fallo:", err);
-                statusDiv.innerText = "Error: " + (err.errorMessage || "No se pudo conectar al servidor.");
-                statusDiv.style.background = "#fefe0000"; // Transparente
+                statusDiv.innerText = "Error: " + (err.errorMessage || "Fallo de red.");
                 statusDiv.style.color = "#dc2626";
                 btn.disabled = false;
-                btn.innerText = "Reintentar Envío";
+                btn.innerText = "Reintentar";
             }
-        };
-
-        client.connect(opcionesConexion);
+        });
     };
 
     function onConnect() {
-        statusDiv.innerText = "Transmitiendo paquete de datos...";
+        statusDiv.innerText = "Transmitiendo datos...";
         
-        const nombre = document.getElementById("nombre").value.trim();
-        const dni = document.getElementById("dni").value.trim();
+        const curso = selectCurso.value;
+        const indiceAlumno = selectEstudiante.value;
+        
+        // Buscamos los datos reales del alumno usando el índice seleccionado
+        const alumnoDatos = baseDatosCursos[curso][indiceAlumno];
+        const nombre = alumnoDatos.nombre;
+        const dni = alumnoDatos.dni;
+        
         const estado = document.getElementById("estado").value;
         const ahora = new Date().toLocaleString();
 
-        // Empaquetado ultra-liviano para redes saturadas
-        const mensajeTexto = `${ahora}|${nombre}|${dni}|${estado}`;
+        // Agregamos el curso al paquete de envío para mantener la prolijidad
+        const mensajeTexto = `${ahora}|${nombre} (${curso})|${dni}|${estado}`;
         
         const message = new Paho.MQTT.Message(mensajeTexto);
         message.destinationName = topico;
-        message.qos = 1; // Asegura la entrega del paquete
+        message.qos = 1;
         
         try {
             client.send(message);
-            
-            // Éxito visual para el alumno
             statusDiv.innerText = "¡Asistencia enviada con éxito!";
-            statusDiv.style.background = "#ecfdf5";
             statusDiv.style.color = "#059669";
-            
-            // Limpiar formulario
             document.getElementById("asistenciaForm").reset();
+            selectEstudiante.disabled = true;
+            selectEstudiante.innerHTML = '<option value="" disabled selected>Primero elegí el curso...</option>';
         } catch (error) {
             statusDiv.innerText = "Error al despachar el paquete.";
             statusDiv.style.color = "#dc2626";
         } finally {
-            btn.disabled = false;
+            btn.disabled = true;
             btn.innerText = "Enviar Registro";
-            
-            // Cortar la conexión inmediatamente para ahorrar batería y datos del alumno
             client.disconnect();
         }
     }
