@@ -53,29 +53,29 @@
     // REEMPLAZÁ ACÁ LAS LISTAS DE ALUMNOS CON TUS CURSOS REALES:
     // =================================================================
     const baseDatosCursos = {
-        "5° 2 CSH°": [
-            { nombre: "ACOSTA PRADO, MAIA CANDELA", curso: "5° 2° CSH"},
-            { nombre: "BARRAZA AVILES, LUZ MIA MARTINA", curso: "5° 2° CSH"}
-            { nombre: "CALFUPAN D'ASTOLFO, SEBASTIAN", curso: "5° 2° CSH"}
-            { nombre: "CAMPOS MONTAÑO, MILAGROS NAHIARA", curso: "5° 2° CSH"}
-            { nombre: "CECCATTO, FRANCESCO", curso: "5° 2° CSH"}
-            { nombre: "CLAROS, ANAHI SOLEDAD", curso: "5° 2° CSH"}
-            { nombre: "COBA, NANCY BELÉN ELIZABETH", curso: "5° 2° CSH"}
-            { nombre: "DELGADO, SANTIAGO AXEL AGUSTIN", curso: "5° 2° CSH"}
-            { nombre: "GALECH, ADRIANO JEAN LUC", curso: "5° 2° CSH"}
-            { nombre: "GARCIA, XIMENA XIOMARA", curso: "5° 2° CSH"}
-            { nombre: "GELABERT HOFSETZ, JULIETA ALEJANDRA", curso: "5° 2° CSH"}
-            { nombre: "GIMENEZ, FIORELLA JENNIFER", curso: "5° 2° CSH"}
-            { nombre: "GITALI, IAN LIONEL", curso: "5° 2° CSH"}
-            { nombre: "JUAREZ, ALMA LUDMILA", curso: "5° 2° CSH"}
-            { nombre: "MARCIAL, ISAÍAS LEONEL", curso: "5° 2° CSH"}
-            { nombre: "NAVARRO BALDOVINO, BIANCA MARIA LUZ", curso: "5° 2° CSH"}
-            { nombre: "OLGUERA CAMPOS, EIMI", curso: "5° 2° CSH"}
-            { nombre: "PERALTA LÓPEZ, JOAQUIN ALBERTO", curso: "5° 2° CSH"}
-            { nombre: "RIOS MALDONADO, ROSANA MARLENE", curso: "5° 2° CSH"}
-            { nombre: "SANABRIA LEGUIZAMON, ROCIO JAZMIN", curso: "5° 2° CSH"}
-            { nombre: "TREDJEU CUAL, MARTINA JAZMÍN", curso: "5° 2° CSH"}
-            { nombre: "VALENZUELA, PAMELA ABIGAIL", curso: "5° 2° CSH"}
+        "5° 2° CSH": [
+            { nombre: "ACOSTA PRADO", curso: "5° 2° CSH" },
+            { nombre: "BARRAZA AVILES", curso: "5° 2° CSH" },
+            { nombre: "CALFUPAN D'ASTOLFO", curso: "5° 2° CSH" },
+            { nombre: "CAMPOS MONTAÑO", curso: "5° 2° CSH" },
+            { nombre: "CECCATTO", curso: "5° 2° CSH" },
+            { nombre: "CLAROS", curso: "5° 2° CSH" },
+            { nombre: "COBA", curso: "5° 2° CSH" },
+            { nombre: "DELGADO", curso: "5° 2° CSH" },
+            { nombre: "GALECH", curso: "5° 2° CSH" },
+            { nombre: "GARCIA", curso: "5° 2° CSH" },
+            { nombre: "GELABERT", curso: "5° 2° CSH" },
+            { nombre: "GIMENEZ", curso: "5° 2° CSH" },
+            { nombre: "GITALI", curso: "5° 2° CSH" },
+            { nombre: "JUAREZ", curso: "5° 2° CSH" },
+            { nombre: "MARCIAL", curso: "5° 2° CSH" },
+            { nombre: "NAVARRO", curso: "5° 2° CSH" },
+            { nombre: "OLGUERA CAMPOS", curso: "5° 2° CSH" },
+            { nombre: "PERALTA LÓPEZ", curso: "5° 2° CSH" },
+            { nombre: "RIOS MALDONADO", curso: "5° 2° CSH" },
+            { nombre: "SANABRIA LEGUIZAMON", curso: "5° 2° CSH" },
+            { nombre: "TREDJEU CUAL", curso: "5° 2° CSH" },
+            { nombre: "VALENZUELA", curso: "5° 2° CSH" }
         ],	
         "5° 2° EYA": [
             { nombre: "Ramírez Rigoberto", dni: "23498784" },
@@ -91,8 +91,8 @@
 
     // DATOS DE TU CONEXIÓN HIVEMQ CLOUD (Mantenelos igual)
     const broker = "d7c00be048ac4f408cd656bbb25ac141.s1.eu.hivemq.cloud"; 
-    const usuario = "COLEGIO750";                             
-    const contrasena = "Presente26";                   
+    const usuario = "COLEGIO750";                                     
+    const contrasena = "Presente26";                    
     const topico = "colegio/asistencia/unica";             
     const puerto = 8884; 
     // =================================================================
@@ -114,7 +114,7 @@
         // Cargar los alumnos del curso elegido
         alumnos.forEach((alumno, indice) => {
             let opt = document.createElement("option");
-            opt.value = indice; // Guardamos el índice para buscar el DNI después
+            opt.value = indice; // Guardamos el índice para buscar los datos después
             opt.innerText = alumno.nombre;
             selectEstudiante.appendChild(opt);
         });
@@ -155,7 +155,8 @@
         // Buscamos los datos reales del alumno usando el índice seleccionado
         const alumnoDatos = baseDatosCursos[curso][indiceAlumno];
         const nombre = alumnoDatos.nombre;
-        const dni = alumnoDatos.dni;
+        // Si no tiene DNI definido, mandamos un guion para que no falle el string
+        const dni = alumnoDatos.dni || "-";
         
         const estado = document.getElementById("estado").value;
         const ahora = new Date().toLocaleString();
