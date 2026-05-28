@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asistencia Dinámica Presencial</title>
+    <title>Asistencia</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
     <style>
         :root { --primary: #1a73e8; --bg: #f0f2f5; }
@@ -15,7 +15,7 @@
         select:focus { outline: none; border-color: var(--primary); background: #fff; }
         button { background: var(--primary); color: white; font-weight: bold; border: none; cursor: pointer; margin-top: 4px; }
         button:disabled { background: #94a3b8; cursor: not-allowed; }
-        #status { text-align: center; font-weight: 600; margin-top: 15px; font-size: 14px; color: #475569; padding: 10px; border-radius: 6px; display: none; line-height: 1.4; white-space: pre-line; }
+        #status { text-align: center; font-weight: 600; margin-top: 15px; font-size: 14px; padding: 10px; border-radius: 6px; display: none; line-height: 1.4; white-space: pre-line; }
     </style>
 </head>
 <body>
@@ -25,7 +25,7 @@
     <form id="asistenciaForm">
         <label>1. SELECCIONÁ TU CURSO</label>
         <select id="curso" disabled required>
-            <option value="" disabled selected>Validando ubicación...</option>
+            <option value="" disabled selected>Cargando...</option>
             <option value="5° 2° CSH">5° 2° CSH</option>
             <option value="5° 2° EYA">5° 2° EYA</option>
             <option value="6° 2° CSH">6° 2° CSH</option>
@@ -34,7 +34,7 @@
 
         <label>2. APELLIDO Y NOMBRE</label>
         <select id="estudiante" disabled required>
-            <option value="" disabled selected>Validando ubicación...</option>
+            <option value="" disabled selected>Cargando...</option>
         </select>
         
         <label>3. ESTADO</label>
@@ -50,14 +50,14 @@
 
 <script>
     // =================================================================
-    // 1. CONFIGURACIÓN GEOGRÁFICA DE LA ESCUELA 
+    // CONFIGURACIÓN GEOGRÁFICA
     // =================================================================
-    const ESCUELA_LAT = -42.748306;       
-    const ESCUELA_LON = -65.039265;       
-    const DISTANCIA_MAXIMA_METROS = 150; // Radio estricto de cobertura
+    const ESCUELA_LAT = -42.774371;       
+    const ESCUELA_LON = -65.042290;       
+    const DISTANCIA_MAXIMA_METROS = 150; 
 
     // =================================================================
-    // 2. BASE DE DATOS DE ALUMNOS
+    // BASE DE DATOS DE ALUMNOS
     // =================================================================
     const baseDatosCursos = {
         "5° 2° CSH": [
@@ -149,13 +149,12 @@
         ]
     };
 
-    // 3. DATOS DE TU CONEXIÓN HIVEMQ CLOUD
+    // PARÁMETROS HIVEMQ
     const broker = "d7c00be048ac4f408cd656bbb25ac141.s1.eu.hivemq.cloud"; 
     const usuario = "COLEGIO750";                                     
     const contrasena = "Presente26";                    
     const topico = "colegio/asistencia/unica";             
     const puerto = 8884; 
-    // =================================================================
 
     const client = new Paho.MQTT.Client(broker, Number(puerto), "web_" + Math.random().toString(16).substr(2, 8));
     const selectCurso = document.getElementById("curso");
@@ -169,70 +168,44 @@
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
-    // AL ENTRAR A LA PÁGINA: Ejecutamos el validador estricto de entrada
+    // INICIO AUTOMÁTICO
     window.onload = function() {
-        const asistenciaHoy = localStorage.getItem("asistencia_enviada_dia");
-        if (asistenciaHoy === obtenerFechaHoy()) {
+        if (localStorage.getItem("asistencia_enviada_dia") === obtenerFechaHoy()) {
             bloquearFormularioPorFraude();
             return;
         }
-        
-        // Si no firmó hoy, iniciamos la verificación de GPS obligatoria para habilitar el formulario
-        verificarUbicacionAlEntrar();
+        validarUbicacionExpress();
     };
 
-    function verificarUbicacionAlEntrar() {
-        statusDiv.style.display = "block";
-        statusDiv.style.background = "#fef3c7";
-        statusDiv.style.color = "#d97706";
-        statusDiv.innerText = "Verificando presencia en el aula...\nBuscando señal de satélite.";
-
-        const watchId = navigator.geolocation.watchPosition(
+    function validarUbicacionExpress() {
+        // Petición directa e instantánea al hardware de GPS
+        navigator.geolocation.getCurrentPosition(
             function(position) {
-                const latAlumno = position.coords.latitude;
-                const lonAlumno = position.coords.longitude;
-                const precision = position.coords.accuracy;
+                const distancia = calcularDistancia(position.coords.latitude, position.coords.longitude, ESCUELA_LAT, ESCUELA_LON);
                 
-                const distancia = calcularDistancia(latAlumno, lonAlumno, ESCUELA_LAT, ESCUELA_LON);
-                
-                // Si la antena da un error mayor a 2500m seguimos esperando calibración
-                if (precision > 10000) {
-                    statusDiv.innerText = `Sincronizando GPS...\nPrecisión actual: +/- ${Math.round(precision)}m`;
-                    return; 
-                }
-
-                // Fijamos la ubicación obtenida
-                navigator.geolocation.clearWatch(watchId);
-
                 if (distancia <= DISTANCIA_MAXIMA_METROS) {
-                    // ¡ESTÁ EN LA ESCUELA! Habilitamos el formulario por primera vez
-                    statusDiv.style.background = "#d1fae5";
-                    statusDiv.style.color = "#065f46";
-                    statusDiv.innerText = `Ubicación validada con éxito.\nYa podés registrar tu asistencia.`;
-                    
-                    // Activamos los componentes
+                    // DENTRO DE RANGO: Habilitación limpia y silenciosa
                     selectCurso.disabled = false;
                     selectCurso.options[0].text = "Elegí tu curso...";
                     selectEstado.disabled = false;
-                    // El botón y el estudiante se habilitan en cascada cuando elija el curso
                 } else {
-                    // FUERA DE RANGO: Queda todo bloqueado permanentemente
-                    statusDiv.style.background = "#fee2e2";
-                    statusDiv.style.color = "#dc2626";
-                    statusDiv.innerText = `Acceso Denegado: Debés estar en el establecimiento.\nDetectado a ${Math.round(distancia)} metros del aula.`;
-                    
+                    // FUERA DE RANGO: Bloqueo directo
                     selectCurso.options[0].text = "Acceso bloqueado por GPS";
                     selectEstudiante.options[0].text = "Acceso bloqueado por GPS";
+                    statusDiv.style.display = "block";
+                    statusDiv.style.background = "#fee2e2";
+                    statusDiv.style.color = "#dc2626";
+                    statusDiv.innerText = "Acceso denegado: No te encontrás en el aula.";
                 }
             },
             function(error) {
-                navigator.geolocation.clearWatch(watchId);
+                selectCurso.options[0].text = "Falta permiso de ubicación";
+                statusDiv.style.display = "block";
                 statusDiv.style.background = "#fee2e2";
                 statusDiv.style.color = "#dc2626";
-                statusDiv.innerText = "Error: Es obligatorio activar el GPS y dar permisos para ingresar.";
-                selectCurso.options[0].text = "Falta permiso de ubicación";
+                statusDiv.innerText = "Error: Activá el GPS para poder ingresar.";
             },
-            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
         );
     }
 
@@ -245,10 +218,9 @@
         statusDiv.style.display = "block";
         statusDiv.style.background = "#fee2e2";
         statusDiv.style.color = "#dc2626";
-        statusDiv.innerText = "Bloqueo de Seguridad: Desde este dispositivo ya se registró una asistencia el día de hoy.";
+        statusDiv.innerText = "Ya registraste tu asistencia por el día de hoy.";
     }
 
-    // Lógica en cascada de estudiantes al elegir curso
     selectCurso.onchange = function() {
         const cursoSeleccionado = selectCurso.value;
         const alumnos = baseDatosCursos[cursoSeleccionado] || [];
@@ -277,12 +249,6 @@
 
     document.getElementById("asistenciaForm").onsubmit = function(e) {
         e.preventDefault();
-        
-        if (localStorage.getItem("asistencia_enviada_dia") === obtenerFechaHoy()) {
-            bloquearFormularioPorFraude();
-            return;
-        }
-
         btn.disabled = true;
         btn.innerText = "Transmitiendo...";
         conectarYEnviarMQTT();
@@ -293,12 +259,13 @@
             userName: usuario,
             password: contrasena,
             useSSL: true,
-            timeout: 7,
+            timeout: 5,
             onSuccess: onConnect,
             onFailure: function(err) {
+                statusDiv.style.display = "block";
                 statusDiv.style.background = "#fee2e2";
                 statusDiv.style.color = "#dc2626";
-                statusDiv.innerText = "Error de red: " + (err.errorMessage || "Fallo de comunicación con el bróker.");
+                statusDiv.innerText = "Error de red al conectar.";
                 btn.disabled = false;
                 btn.innerText = "Reintentar";
             }
@@ -324,18 +291,12 @@
         try {
             client.send(message);
             localStorage.setItem("asistencia_enviada_dia", obtenerFechaHoy());
-            
             document.getElementById("asistenciaForm").reset();
-            selectEstudiante.innerHTML = '<option value="" disabled selected>Primero elegí el curso...</option>';
-            
             bloquearFormularioPorFraude();
-            statusDiv.innerText = "¡Asistencia registrada con éxito!\nDispositivo bloqueado hasta mañana.";
+            statusDiv.innerText = "Asistencia registrada con éxito.";
             statusDiv.style.background = "#ecfdf5";
             statusDiv.style.color = "#059669";
-            
         } catch (error) {
-            statusDiv.innerText = "Error al despachar el paquete.";
-            statusDiv.style.color = "#dc2626";
             btn.disabled = false;
             btn.innerText = "Enviar Registro";
         } finally {
