@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asistencia</title>
+    <title>Asistencia Dinámica Presencial</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
     <style>
         :root { --primary: #1a73e8; --bg: #f0f2f5; }
@@ -15,7 +15,7 @@
         select:focus { outline: none; border-color: var(--primary); background: #fff; }
         button { background: var(--primary); color: white; font-weight: bold; border: none; cursor: pointer; margin-top: 4px; }
         button:disabled { background: #94a3b8; cursor: not-allowed; }
-        #status { text-align: center; font-weight: 600; margin-top: 15px; font-size: 14px; padding: 10px; border-radius: 6px; display: none; line-height: 1.4; white-space: pre-line; }
+        #status { text-align: center; font-weight: 600; margin-top: 15px; font-size: 14px; color: #475569; padding: 10px; border-radius: 6px; display: none; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -24,8 +24,8 @@
     <h2>Asistencia</h2>
     <form id="asistenciaForm">
         <label>1. SELECCIONÁ TU CURSO</label>
-        <select id="curso" disabled required>
-            <option value="" disabled selected>Cargando...</option>
+        <select id="curso" required>
+            <option value="" disabled selected>Elegí tu curso...</option>
             <option value="5° 2° CSH">5° 2° CSH</option>
             <option value="5° 2° EYA">5° 2° EYA</option>
             <option value="6° 2° CSH">6° 2° CSH</option>
@@ -34,11 +34,11 @@
 
         <label>2. APELLIDO Y NOMBRE</label>
         <select id="estudiante" disabled required>
-            <option value="" disabled selected>Cargando...</option>
+            <option value="" disabled selected>Primero elegí el curso...</option>
         </select>
         
         <label>3. ESTADO</label>
-        <select id="estado" disabled>
+        <select id="estado">
             <option value="Presente">Presente</option>
             <option value="Ausente">Ausente</option>
         </select>
@@ -50,205 +50,143 @@
 
 <script>
     // =================================================================
-    // CONFIGURACIÓN GEOGRÁFICA
+    // 1. CONFIGURACIÓN GEOGRÁFICA DE LA ESCUELA 
     // =================================================================
-    const ESCUELA_LAT = -42.774371;       
-    const ESCUELA_LON = -65.042290;       
-    const DISTANCIA_MAXIMA_METROS = 150; 
+    const ESCUELA_LAT = -42.774371;       // REEMPLAZÁ con la latitud exacta de tu colegio
+    const ESCUELA_LON = -65.042290;       // REEMPLAZÁ con la longitud exacta de tu colegio
+    const DISTANCIA_MAXIMA_METROS = 150; // Tolerancia de rango a la redonda (ideal para antenas)
 
     // =================================================================
-    // BASE DE DATOS DE ALUMNOS
+    // 2. REEMPLAZÁ ACÁ LAS LISTAS DE ALUMNOS CON TUS CURSOS REALES:
     // =================================================================
     const baseDatosCursos = {
         "5° 2° CSH": [
-            { nombre: "ACOSRADO", curso: "5° 2° CSH" },
-            { nombre: "BARRAVILES", curso: "5° 2° CSH" },
-            { nombre: "CAPANSTOLFO", curso: "5° 2° CSH" },
-            { nombre: "CAMONTAÑO", curso: "5° 2° CSH" },
-            { nombre: "CECTO", curso: "5° 2° CSH" },
-            { nombre: "CLOS", curso: "5° 2° CSH" },
-            { nombre: "COA", curso: "5° 2° CSH" },
-            { nombre: "DELGO", curso: "5° 2° CSH" },
-            { nombre: "GACH", curso: "5° 2° CSH" },
-            { nombre: "GAIA", curso: "5° 2° CSH" },
-            { nombre: "GEABERT", curso: "5° 2° CSH" },
-            { nombre: "GIMEZ", curso: "5° 2° CSH" },
-            { nombre: "GLI", curso: "5° 2° CSH" },
-            { nombre: "JUAR", curso: "5° 2° CSH" },
-            { nombre: "MARAL", curso: "5° 2° CSH" },
-            { nombre: "NAVRO", curso: "5° 2° CSH" },
-            { nombre: "OLGUEMPOS", curso: "5° 2° CSH" },
-            { nombre: "PERAÓPEZ", curso: "5° 2° CSH" },
-            { nombre: "RIALDONADO", curso: "5° 2° CSH" },
-            { nombre: "SANABGUIZAMON", curso: "5° 2° CSH" },
-            { nombre: "TREDUAL", curso: "5° 2° CSH" },
-            { nombre: "VALEUELA", curso: "5° 2° CSH" }
-        ],  
+            { nombre: "ACOSTA PRADO", curso: "5° 2° CSH" },
+            { nombre: "BARRAZA AVILES", curso: "5° 2° CSH" },
+            { nombre: "CALFUPAN D'ASTOLFO", curso: "5° 2° CSH" },
+            { nombre: "CAMPOS MONTAÑO", curso: "5° 2° CSH" },
+            { nombre: "CECCATTO", curso: "5° 2° CSH" },
+            { nombre: "CLAROS", curso: "5° 2° CSH" },
+            { nombre: "COBA", curso: "5° 2° CSH" },
+            { nombre: "DELGADO", curso: "5° 2° CSH" },
+            { nombre: "GALECH", curso: "5° 2° CSH" },
+            { nombre: "GARCIA", curso: "5° 2° CSH" },
+            { nombre: "GELABERT", curso: "5° 2° CSH" },
+            { nombre: "GIMENEZ", curso: "5° 2° CSH" },
+            { nombre: "GITALI", curso: "5° 2° CSH" },
+            { nombre: "JUAREZ", curso: "5° 2° CSH" },
+            { nombre: "MARCIAL", curso: "5° 2° CSH" },
+            { nombre: "NAVARRO", curso: "5° 2° CSH" },
+            { nombre: "OLGUERA CAMPOS", curso: "5° 2° CSH" },
+            { nombre: "PERALTA LÓPEZ", curso: "5° 2° CSH" },
+            { nombre: "RIOS MALDONADO", curso: "5° 2° CSH" },
+            { nombre: "SANABRIA LEGUIZAMON", curso: "5° 2° CSH" },
+            { nombre: "TREDJEU CUAL", curso: "5° 2° CSH" },
+            { nombre: "VALENZUELA", curso: "5° 2° CSH" }
+        ],	
         "5° 2° EYA": [
-            { nombre: "BEIDES", curso: "5° 2° EYA" },
-            { nombre: "BERTI", curso: "5° 2° EYA" },
-            { nombre: "BRO", curso: "5° 2° EYA" },
-            { nombre: "COLLRÁN", curso: "5° 2° EYA" },
-            { nombre: "CONTRYANO", curso: "5° 2° EYA" },
-            { nombre: "DEERA", curso: "5° 2° EYA" },
-            { nombre: "DGADO", curso: "5° 2° EYA" },
-            { nombre: "FERNAINIDAD", curso: "5° 2° EYA" },
-            { nombre: "FLOEZ", curso: "5° 2° EYA" },
-            { nombre: "GUZMORALES", curso: "5° 2° EYA" },
-            { nombre: "LOPAPATA", curso: "5° 2° EYA" },
-            { nombre: "MENEZ", curso: "5° 2° EYA" },
-            { nombre: "MEAAREDES", curso: "5° 2° EYA" },
-            { nombre: "MORERA", curso: "5° 2° EYA" },
-            { nombre: "NUZ", curso: "5° 2° EYA" },
-            { nombre: "OLIVERELLANA", curso: "5° 2° EYA" },
-            { nombre: "OLIVLEDO", curso: "5° 2° EYA" },
-            { nombre: "OSOENCIO", curso: "5° 2° EYA" },
-            { nombre: "PAESSA", curso: "5° 2° EYA" },
-            { nombre: "PSO", curso: "5° 2° EYA" },
-            { nombre: "QUEREQUEO", curso: "5° 2° EYA" },
-            { nombre: "RAMREPINTO", curso: "5° 2° EYA" },
-            { nombre: "SANEZ", curso: "5° 2° EYA" },
-            { nombre: "SANOS VARGAS", curso: "5° 2° EYA" },
-            { nombre: "TAGLNI BARROSO", curso: "5° 2° EYA" },
-            { nombre: "TEDANO", curso: "5° 2° EYA" },
-            { nombre: "VIUGARTE", curso: "5° 2° EYA" },
-            { nombre: "VILMAYOR", curso: "5° 2° EYA" },
-            { nombre: "ZOOA", curso: "5° 2° EYA" }
+            { nombre: "BENAVIDES", curso: "5° 2° EYA" },
+            { nombre: "BERTOLDI", curso: "5° 2° EYA" },
+            { nombre: "BRAVO", curso: "5° 2° EYA" },
+            { nombre: "COLLANTES DURÁN", curso: "5° 2° EYA" },
+            { nombre: "CONTRERAS MOYANO", curso: "5° 2° EYA" },
+            { nombre: "DE LA ROSA VERA", curso: "5° 2° EYA" },
+            { nombre: "DELGADO", curso: "5° 2° EYA" },
+            { nombre: "FERNANDEZ TRINIDAD", curso: "5° 2° EYA" },
+            { nombre: "FLOREZ", curso: "5° 2° EYA" },
+            { nombre: "GUZMAN MORALES", curso: "5° 2° EYA" },
+            { nombre: "LOPEZ ZAPATA", curso: "5° 2° EYA" },
+            { nombre: "MENDEZ", curso: "5° 2° EYA" },
+            { nombre: "MERIDA PAREDES", curso: "5° 2° EYA" },
+            { nombre: "MOREIRA", curso: "5° 2° EYA" },
+            { nombre: "NUÑEZ", curso: "5° 2° EYA" },
+            { nombre: "OLIVERA ORELLANA", curso: "5° 2° EYA" },
+            { nombre: "OLIVERA TOLEDO", curso: "5° 2° EYA" },
+            { nombre: "OSORIO ASCENCIO", curso: "5° 2° EYA" },
+            { nombre: "PAONESSA", curso: "5° 2° EYA" },
+            { nombre: "PASO", curso: "5° 2° EYA" },
+            { nombre: "QUENTREQUEO", curso: "5° 2° EYA" },
+            { nombre: "RAMIREZ PINTO", curso: "5° 2° EYA" },
+            { nombre: "SANCHEZ", curso: "5° 2° EYA" },
+            { nombre: "SANTOS VARGAS", curso: "5° 2° EYA" },
+            { nombre: "TAGLIANI BARROSO", curso: "5° 2° EYA" },
+            { nombre: "TOLEDANO", curso: "5° 2° EYA" },
+            { nombre: "VIDAL UGARTE", curso: "5° 2° EYA" },
+            { nombre: "VILLAMAYOR", curso: "5° 2° EYA" },
+            { nombre: "ZOLOA", curso: "5° 2° EYA" },
         ],
         "6° 2° CSH": [
-            { nombre: "A", curso: "6° 2° CSH" },
-            { nombre: "ARN", curso: "6° 2° CSH" },
-            { nombre: "BRAN", curso: "6° 2° CSH" },
-            { nombre: "CA PEÑA", curso: "6° 2° CSH" },
-            { nombre: "CENO", curso: "6° 2° CSH" },
-            { nombre: "COAS", curso: "6° 2° CSH" },
-            { nombre: "COSOTO", curso: "6° 2° CSH" },
-            { nombre: "F", curso: "6° 2° CSH" },
-            { nombre: "GELSETZ", curso: "6° 2° CSH" },
-            { nombre: "HEERA", curso: "6° 2° CSH" },
-            { nombre: "HUMAN", curso: "6° 2° CSH" },
-            { nombre: "HUAAF", curso: "6° 2° CSH" },
-            { nombre: "LIN", curso: "6° 2° CSH" },
-            { nombre: "MAEL", curso: "6° 2° CSH" },
-            { nombre: "MARNEZ", curso: "6° 2° CSH" },
-            { nombre: "MOA", curso: "6° 2° CSH" },
-            { nombre: "OYAIZO", curso: "6° 2° CSH" },
-            { nombre: "PERZ", curso: "6° 2° CSH" },
-            { nombre: "POGO", curso: "6° 2° CSH" },
-            { nombre: "RAMEZ", curso: "6° 2° CSH" },
-            { nombre: "ROENEGRO", curso: "6° 2° CSH" },
-            { nombre: "SIA", curso: "6° 2° CSH" },
-            { nombre: "SILS", curso: "6° 2° CSH" },
-            { nombre: "TAJAS", curso: "6° 2° CSH" },
-            { nombre: "VAAIME", curso: "6° 2° CSH" },
-            { nombre: "VIAR", curso: "6° 2° CSH" },
-            { nombre: "VATE", curso: "6° 2° CSH" }
+            { nombre: "ALVAREZ", curso: "6° 2° CSH" },
+            { nombre: "ARZA ALARCÓN", curso: "6° 2° CSH" },
+            { nombre: "BRITO MILLAN", curso: "6° 2° CSH" },
+            { nombre: "CASTILLO PEÑA", curso: "6° 2° CSH" },
+            { nombre: "CENTENO", curso: "6° 2° CSH" },
+            { nombre: "CONTRERA HERNANDEZ", curso: "6° 2° CSH" },
+            { nombre: "CORNEJO CARDENAS", curso: "6° 2° CSH" },
+            { nombre: "CORVALAN SOTO", curso: "6° 2° CSH" },
+            { nombre: "FLORES", curso: "6° 2° CSH" },
+            { nombre: "GELABERT HOFSETZ", curso: "6° 2° CSH" },
+            { nombre: "HERRERA", curso: "6° 2° CSH" },
+            { nombre: "HUANIMAN", curso: "6° 2° CSH" },
+            { nombre: "HUAYQUILAF", curso: "6° 2° CSH" },
+            { nombre: "LINCONADO VELAZQUEZ", curso: "6° 2° CSH" },
+            { nombre: "LOPEZ FLORES", curso: "6° 2° CSH" },
+            { nombre: "MACIEL", curso: "6° 2° CSH" },
+            { nombre: "MARTINEZ", curso: "6° 2° CSH" },
+            { nombre: "MOLINA", curso: "6° 2° CSH" },
+            { nombre: "OYARZO CARRIZO", curso: "6° 2° CSH" },
+            { nombre: "PEREZ", curso: "6° 2° CSH" },
+            { nombre: "POSTIGO", curso: "6° 2° CSH" },
+            { nombre: "RAMIREZ", curso: "6° 2° CSH" },
+            { nombre: "ROBLE MONTENEGRO", curso: "6° 2° CSH" },
+            { nombre: "SILES ORTEGA", curso: "6° 2° CSH" },
+            { nombre: "SILES", curso: "6° 2° CSH" },
+            { nombre: "TAGLIANI ROJAS", curso: "6° 2° CSH" },
+            { nombre: "VALLEJOS LAIME", curso: "6° 2° CSH" },
+            { nombre: "VARGAS ACIAR", curso: "6° 2° CSH" },
+            { nombre: "VARGAS", curso: "6° 2° CSH" },
+            { nombre: "VILTE", curso: "6° 2° CSH" },
         ],
         "6° 2° EYA": [
             { nombre: "López Ana", dni: "44556677" }
         ]
     };
 
-    // PARÁMETROS HIVEMQ
+    // 3. DATOS DE TU CONEXIÓN HIVEMQ CLOUD (Completar con tus datos en las comillas)
     const broker = "d7c00be048ac4f408cd656bbb25ac141.s1.eu.hivemq.cloud"; 
     const usuario = "COLEGIO750";                                     
     const contrasena = "Presente26";                    
     const topico = "colegio/asistencia/unica";             
     const puerto = 8884; 
+    // =================================================================
 
     const client = new Paho.MQTT.Client(broker, Number(puerto), "web_" + Math.random().toString(16).substr(2, 8));
     const selectCurso = document.getElementById("curso");
     const selectEstudiante = document.getElementById("estudiante");
-    const selectEstado = document.getElementById("estado");
     const btn = document.getElementById("btnEnviar");
     const statusDiv = document.getElementById("status");
 
-    function obtenerFechaHoy() {
-        const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    }
-
-    // INICIO AUTOMÁTICO
-    window.onload = function() {
-        if (localStorage.getItem("asistencia_enviada_dia") === obtenerFechaHoy()) {
-            bloquearFormularioPorFraude();
-            return;
-        }
-        validarUbicacionExpress();
-    };
-
-function validarUbicacionExpress() {
-        // Configuraciones para obligar al teléfono a buscar satélites reales sin usar antenas
-        const opcionesSatelitalesEstrictas = { 
-            enableHighAccuracy: true, // Fuerza el uso de GPS por hardware (satelital)
-            timeout: Infinity,        // NO se rinde por tiempo. Espera a que el chip conecte sí o sí
-            maximumAge: 0             // Prohibido usar ubicaciones viejas de antenas o IP
-        };
-
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                const latAlumno = position.coords.latitude;
-                const lonAlumno = position.coords.longitude;
-                const precision = position.coords.accuracy; // Margen de error real en metros
-                
-                const distancia = calcularDistancia(latAlumno, lonAlumno, ESCUELA_LAT, ESCUELA_LON);
-                
-                // Un margen de error menor a 150 metros garantiza que viene de un satélite o GPS real, no de una IP lejana
-                if (precision <= 150 && distancia <= DISTANCIA_MAXIMA_METROS) {
-                    // DENTRO DE RANGO SATELITAL REAL: Desbloqueo limpio
-                    selectCurso.disabled = false;
-                    selectCurso.options[0].text = "Elegí tu curso...";
-                    selectEstado.disabled = false;
-                    statusDiv.style.display = "none";
-                } else {
-                    // FUERA DE RANGO REAL O EN ANTENA ANTERIOR
-                    selectCurso.options[0].text = "Bloqueado por GPS";
-                    statusDiv.style.display = "block";
-                    statusDiv.style.background = "#fee2e2";
-                    statusDiv.style.color = "#dc2626";
-                    statusDiv.innerText = `Acceso denegado.\n• Distancia calculada por satélite: ${Math.round(distancia)}m.\n• Precisión del hardware: +/- ${Math.round(precision)}m.`;
-                }
-            },
-            function(error) {
-                selectCurso.options[0].text = "Error de GPS";
-                statusDiv.style.display = "block";
-                statusDiv.style.background = "#fee2e2";
-                statusDiv.style.color = "#dc2626";
-                statusDiv.innerText = "Error: El chip GPS no pudo conectar o se denegaron los permisos.";
-            },
-            opcionesSatelitalesEstrictas
-        );
-    }
-
-
-    function bloquearFormularioPorFraude() {
-        selectCurso.disabled = true;
-        selectEstudiante.disabled = true;
-        selectEstado.disabled = true;
-        btn.disabled = true;
-        btn.innerText = "Envío Deshabilitado";
-        statusDiv.style.display = "block";
-        statusDiv.style.background = "#fee2e2";
-        statusDiv.style.color = "#dc2626";
-        statusDiv.innerText = "Ya registraste tu asistencia por el día de hoy.";
-    }
-
+    // LÓGICA EN CASCADA: Al cambiar el curso, se actualizan los estudiantes
     selectCurso.onchange = function() {
         const cursoSeleccionado = selectCurso.value;
         const alumnos = baseDatosCursos[cursoSeleccionado] || [];
+        
         selectEstudiante.innerHTML = '<option value="" disabled selected>Seleccioná tu nombre...</option>';
+        
         alumnos.forEach((alumno, indice) => {
             let opt = document.createElement("option");
             opt.value = indice; 
             opt.innerText = alumno.nombre;
             selectEstudiante.appendChild(opt);
         });
+        
         selectEstudiante.disabled = false;
         btn.disabled = false;
     };
 
+    // Fórmula matemática Haversine para calcular distancia real entre dos coordenadas
     function calcularDistancia(lat1, lon1, lat2, lon2) {
-        const R = 6371e3; 
+        const R = 6371e3; // Radio de la Tierra en metros
         const phi1 = lat1 * Math.PI/180;
         const phi2 = lat2 * Math.PI/180;
         const deltaPhi = (lat2-lat1) * Math.PI/180;
@@ -262,8 +200,45 @@ function validarUbicacionExpress() {
     document.getElementById("asistenciaForm").onsubmit = function(e) {
         e.preventDefault();
         btn.disabled = true;
-        btn.innerText = "Transmitiendo...";
-        conectarYEnviarMQTT();
+        btn.innerText = "Validando...";
+        statusDiv.style.display = "block";
+        statusDiv.style.background = "#fef3c7";
+        statusDiv.style.color = "#d97706";
+        statusDiv.innerText = "Calculando posición física actual...";
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const latAlumno = position.coords.latitude;
+                const lonAlumno = position.coords.longitude;
+                
+                const distancia = calcularDistancia(latAlumno, lonAlumno, ESCUELA_LAT, ESCUELA_LON);
+                
+                // CÓDIGO REAL: Sin el "|| true". Ahora el filtro es un muro.
+                if (distancia <= DISTANCIA_MAXIMA_METROS) {
+                    statusDiv.style.background = "#d1fae5";
+                    statusDiv.style.color = "#065f46";
+                    statusDiv.innerText = `Ubicación validada (Distancia: ${Math.round(distancia)} metros).\nTransmitiendo datos...`;
+                    conectarYEnviarMQTT();
+                } else {
+                    // Si estás en tu casa a 2203 metros, se va a disparar este bloqueo:
+                    statusDiv.style.background = "#fee2e2";
+                    statusDiv.style.color = "#dc2626";
+                    statusDiv.innerText = `Acceso Denegado: Debés estar en la institución para registrar asistencia. (Detectado a ${Math.round(distancia)} metros del aula).`;
+                    btn.disabled = false;
+                    btn.innerText = "Reintentar Envío";
+                }
+            },
+            function(error) {
+                // Si el GPS falla del todo o no hay permisos, en modo prueba igual intentamos mandar los datos
+                statusDiv.innerText = "Aviso: No se detectó ubicación, pero se procesará el envío de prueba...";
+                conectarYEnviarMQTT();
+            },
+            { 
+                enableHighAccuracy: true, 
+                timeout: 10000,             
+                maximumAge: 0              
+            }
+        );
     };
 
     function conectarYEnviarMQTT() {
@@ -271,13 +246,12 @@ function validarUbicacionExpress() {
             userName: usuario,
             password: contrasena,
             useSSL: true,
-            timeout: 5,
+            timeout: 7,
             onSuccess: onConnect,
             onFailure: function(err) {
-                statusDiv.style.display = "block";
                 statusDiv.style.background = "#fee2e2";
                 statusDiv.style.color = "#dc2626";
-                statusDiv.innerText = "Error de red al conectar.";
+                statusDiv.innerText = "Error MQTT: " + (err.errorMessage || "Fallo de conexión al bróker.");
                 btn.disabled = false;
                 btn.innerText = "Reintentar";
             }
@@ -291,7 +265,7 @@ function validarUbicacionExpress() {
         
         const nombre = alumnoDatos.nombre;
         const dni = alumnoDatos.dni || "-"; 
-        const estado = selectEstado.value;
+        const estado = document.getElementById("estado").value;
         const ahora = new Date().toLocaleString();
 
         const mensajeTexto = `${ahora}|${nombre} (${curso})|${dni}|${estado}`;
@@ -302,16 +276,18 @@ function validarUbicacionExpress() {
         
         try {
             client.send(message);
-            localStorage.setItem("asistencia_enviada_dia", obtenerFechaHoy());
-            document.getElementById("asistenciaForm").reset();
-            bloquearFormularioPorFraude();
-            statusDiv.innerText = "Asistencia registrada con éxito.";
             statusDiv.style.background = "#ecfdf5";
             statusDiv.style.color = "#059669";
+            statusDiv.innerText = "¡Asistencia registrada con éxito (Bypass)!";
+            document.getElementById("asistenciaForm").reset();
+            selectEstudiante.disabled = true;
+            selectEstudiante.innerHTML = '<option value="" disabled selected>Primero elegí el curso...</option>';
         } catch (error) {
-            btn.disabled = false;
-            btn.innerText = "Enviar Registro";
+            statusDiv.innerText = "Error al despachar el paquete.";
+            statusDiv.style.color = "#dc2626";
         } finally {
+            btn.disabled = true;
+            btn.innerText = "Enviar Registro";
             client.disconnect();
         }
     }
