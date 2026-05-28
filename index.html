@@ -213,14 +213,17 @@
                 
                 const distancia = calcularDistancia(latAlumno, lonAlumno, ESCUELA_LAT, ESCUELA_LON);
                 
-                // TRUCO DE PRUEBA (|| true): Fuerza al código a dejarte transmitir siempre
-                if (distancia <= DISTANCIA_MAXIMA_METROS || true) {
-                    statusDiv.innerText = `[Bypass de Prueba Activo]\nUbicación calculada: a ${Math.round(distancia)} metros.\nConectando y enviando por MQTT...`;
+                // CÓDIGO REAL: Sin el "|| true". Ahora el filtro es un muro.
+                if (distancia <= DISTANCIA_MAXIMA_METROS) {
+                    statusDiv.style.background = "#d1fae5";
+                    statusDiv.style.color = "#065f46";
+                    statusDiv.innerText = `Ubicación validada (Distancia: ${Math.round(distancia)} metros).\nTransmitiendo datos...`;
                     conectarYEnviarMQTT();
                 } else {
+                    // Si estás en tu casa a 2203 metros, se va a disparar este bloqueo:
                     statusDiv.style.background = "#fee2e2";
                     statusDiv.style.color = "#dc2626";
-                    statusDiv.innerText = `Fuera de rango escolar. Detectado a ${Math.round(distancia)}m.`;
+                    statusDiv.innerText = `Acceso Denegado: Debés estar en la institución para registrar asistencia. (Detectado a ${Math.round(distancia)} metros del aula).`;
                     btn.disabled = false;
                     btn.innerText = "Reintentar Envío";
                 }
