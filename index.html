@@ -178,59 +178,60 @@
     };
 
 function validarUbicacionExpress() {
-        // Configuramos opciones para un equilibrio perfecto entre velocidad y precisión
-        const opcionesGps = { 
-            enableHighAccuracy: true, 
-            timeout: 6000,          // Le damos 6 segundos para intentar conectar con satélites
-            maximumAge: 5000        // Acepta ubicaciones recientes de hasta 5 segundos (evita el salto a la IP)
-        };
+        // Opción A: Intento ultra rápido por IP/Redes usando Geolocation API (Ideal para interiores)
+        fetch('https://www.googleapis.com/geolocation/v1/geolocate?key=ALERTA_DEBES_PONER_TU_KEY_AQUI', {
+            method: 'POST',
+            body: JSON.stringify({ considerIp: true }),
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.location) {
+                procesarCoordenadas(data.location.lat, data.location.lng);
+            } else {
+                usarGpsNativoFallback();
+            }
+        })
+        .catch(() => {
+            // Si no hay internet estable o API Key, va al plan B automáticamente
+            usarGpsNativoFallback();
+        });
+    }
 
+    function procesarCoordenadas(lat, lon) {
+        const distancia = calcularDistancia(lat, lon, ESCUELA_LAT, ESCUELA_LON);
+        
+        if (distancia <= DISTANCIA_MAXIMA_METROS) {
+            // DENTRO DEL RANGO: Desbloqueo limpio e inmediato
+            selectCurso.disabled = false;
+            selectCurso.options[0].text = "Elegí tu curso...";
+            selectEstado.disabled = false;
+            statusDiv.style.display = "none";
+        } else {
+            // FUERA DEL RANGO
+            selectCurso.options[0].text = "Acceso bloqueado por GPS";
+            selectEstudiante.options[0].text = "Acceso bloqueado por GPS";
+            statusDiv.style.display = "block";
+            statusDiv.style.background = "#fee2e2";
+            statusDiv.style.color = "#dc2626";
+            statusDiv.innerText = `Acceso denegado: No te encontrás en el aula.\n(Detectado a ${Math.round(distancia)}m)`;
+        }
+    }
+
+    function usarGpsNativoFallback() {
+        // Plan B: El sistema clásico si falla el anterior, pero con tiempo límite estricto de 4 segundos
         navigator.geolocation.getCurrentPosition(
             function(position) {
-                const latAlumno = position.coords.latitude;
-                const lonAlumno = position.coords.longitude;
-                const precision = position.coords.accuracy; // Margen de error en metros
-                
-                const distancia = calcularDistancia(latAlumno, lonAlumno, ESCUELA_LAT, ESCUELA_LON);
-                
-                // Si la antena está muy imprecisa (más de 1000m), probablemente falló el GPS real
-                if (precision > 1000 && distancia > DISTANCIA_MAXIMA_METROS) {
-                    selectCurso.options[0].text = "Buscando señal GPS real...";
-                    // Reintentamos una vez más automáticamente en 2 segundos
-                    setTimeout(validarUbicacionExpress, 2000);
-                    return;
-                }
-
-                if (distancia <= DISTANCIA_MAXIMA_METROS) {
-                    // DENTRO DE RANGO: Habilitación inmediata
-                    selectCurso.disabled = false;
-                    selectCurso.options[0].text = "Elegí tu curso...";
-                    selectEstado.disabled = false;
-                    statusDiv.style.display = "none"; // Ocultamos cualquier error previo si reintentó
-                } else {
-                    // FUERA DE RANGO REAL
-                    selectCurso.options[0].text = "Acceso bloqueado por GPS";
-                    selectEstudiante.options[0].text = "Acceso bloqueado por GPS";
-                    statusDiv.style.display = "block";
-                    statusDiv.style.background = "#fee2e2";
-                    statusDiv.style.color = "#dc2626";
-                    statusDiv.innerText = `Acceso denegado: No te encontrás en el aula.\n(Detectado a ${Math.round(distancia)}m de la coordenada)`;
-                }
+                procesarCoordenadas(position.coords.latitude, position.coords.longitude);
             },
             function(error) {
-                // Si da timeout o error, reintentamos silenciosamente una vez más
-                if (error.code === error.TIMEOUT) {
-                    selectCurso.options[0].text = "Sincronizando satélites...";
-                    setTimeout(validarUbicacionExpress, 1500);
-                } else {
-                    selectCurso.options[0].text = "Falta permiso de ubicación";
-                    statusDiv.style.display = "block";
-                    statusDiv.style.background = "#fee2e2";
-                    statusDiv.style.color = "#dc2626";
-                    statusDiv.innerText = "Error: Activá el GPS y dale permisos al navegador.";
-                }
+                selectCurso.options[0].text = "Error de ubicación";
+                statusDiv.style.display = "block";
+                statusDiv.style.background = "#fee2e2";
+                statusDiv.style.color = "#dc2626";
+                statusDiv.innerText = "Error: Por favor, activa el GPS del dispositivo.";
             },
-            opcionesGps
+            { enableHighAccuracy: false, timeout: 4000, maximumAge: 10000 }
         );
     }
 
