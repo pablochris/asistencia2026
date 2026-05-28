@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asistencia Dinámica Presencial</title>
+    <title>Asistencia Aula</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
     <style>
         :root { --primary: #1a73e8; --bg: #f0f2f5; }
@@ -15,7 +15,7 @@
         select:focus { outline: none; border-color: var(--primary); background: #fff; }
         button { background: var(--primary); color: white; font-weight: bold; border: none; cursor: pointer; margin-top: 4px; }
         button:disabled { background: #94a3b8; cursor: not-allowed; }
-        #status { text-align: center; font-weight: 600; margin-top: 15px; font-size: 14px; color: #475569; padding: 10px; border-radius: 6px; display: none; line-height: 1.4; }
+        #status { text-align: center; font-weight: 600; margin-top: 15px; font-size: 14px; padding: 10px; border-radius: 6px; display: none; line-height: 1.4; white-space: pre-line; }
     </style>
 </head>
 <body>
@@ -32,9 +32,9 @@
             <option value="6° 2° EYA">6° 2° EYA</option>
         </select>
 
-        <label>2. APELLIDO Y NOMBRE</label>
+        <label>2. APELLIDO</label>
         <select id="estudiante" disabled required>
-            <option value="" disabled selected>Primero elegí el curso...</option>
+            <option value="" disabled selected>Primero seleccioná un curso...</option>
         </select>
         
         <label>3. ESTADO</label>
@@ -50,14 +50,7 @@
 
 <script>
     // =================================================================
-    // 1. CONFIGURACIÓN GEOGRÁFICA DE LA ESCUELA 
-    // =================================================================
-    const ESCUELA_LAT = -42.748289;       // REEMPLAZÁ con la latitud exacta de tu colegio
-    const ESCUELA_LON = -65.039225;       // REEMPLAZÁ con la longitud exacta de tu colegio
-    const DISTANCIA_MAXIMA_METROS = 1000; // Tolerancia de rango a la redonda (ideal para antenas)
-
-    // =================================================================
-    // 2. REEMPLAZÁ ACÁ LAS LISTAS DE ALUMNOS CON TUS CURSOS REALES:
+    // BASE DE DATOS DE ALUMNOS
     // =================================================================
     const baseDatosCursos = {
         "5° 2° CSH": [
@@ -152,7 +145,9 @@
         ]
     };
 
-    // 3. DATOS DE TU CONEXIÓN HIVEMQ CLOUD (Completar con tus datos en las comillas)
+    // =================================================================
+    // PARÁMETROS DE CONEXIÓN HIVEMQ CLOUD
+    // =================================================================
     const broker = "d7c00be048ac4f408cd656bbb25ac141.s1.eu.hivemq.cloud"; 
     const usuario = "COLEGIO750";                                     
     const contrasena = "Presente26";                    
@@ -163,16 +158,40 @@
     const client = new Paho.MQTT.Client(broker, Number(puerto), "web_" + Math.random().toString(16).substr(2, 8));
     const selectCurso = document.getElementById("curso");
     const selectEstudiante = document.getElementById("estudiante");
+    const selectEstado = document.getElementById("estado");
     const btn = document.getElementById("btnEnviar");
     const statusDiv = document.getElementById("status");
 
-    // LÓGICA EN CASCADA: Al cambiar el curso, se actualizan los estudiantes
+    function obtenerFechaHoy() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    // Al cargar la página, solo chequeamos que no haya enviado ya su registro hoy
+    window.onload = function() {
+        if (localStorage.getItem("asistencia_enviada_dia") === obtenerFechaHoy()) {
+            bloquearFormularioPorFraude();
+        }
+    };
+
+    function bloquearFormularioPorFraude() {
+        selectCurso.disabled = true;
+        selectEstudiante.disabled = true;
+        selectEstado.disabled = true;
+        btn.disabled = true;
+        btn.innerText = "Envío Deshabilitado";
+        statusDiv.style.display = "block";
+        statusDiv.style.background = "#fee2e2";
+        statusDiv.style.color = "#dc2626";
+        statusDiv.innerText = "Bloqueo: Desde este dispositivo ya se registró una asistencia hoy.";
+    }
+
+    // Lógica en cascada de estudiantes al elegir curso
     selectCurso.onchange = function() {
         const cursoSeleccionado = selectCurso.value;
         const alumnos = baseDatosCursos[cursoSeleccionado] || [];
         
-        selectEstudiante.innerHTML = '<option value="" disabled selected>Seleccioná tu nombre...</option>';
-        
+        selectEstudiante.innerHTML = '<option value="" disabled selected>Seleccioná tu apellido...</option>';
         alumnos.forEach((alumno, indice) => {
             let opt = document.createElement("option");
             opt.value = indice; 
@@ -184,61 +203,17 @@
         btn.disabled = false;
     };
 
-    // Fórmula matemática Haversine para calcular distancia real entre dos coordenadas
-    function calcularDistancia(lat1, lon1, lat2, lon2) {
-        const R = 6371e3; // Radio de la Tierra en metros
-        const phi1 = lat1 * Math.PI/180;
-        const phi2 = lat2 * Math.PI/180;
-        const deltaPhi = (lat2-lat1) * Math.PI/180;
-        const deltaLambda = (lon2-lon1) * Math.PI/180;
-        const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
-                  Math.cos(phi1) * Math.cos(phi2) *
-                  Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    }
-
     document.getElementById("asistenciaForm").onsubmit = function(e) {
         e.preventDefault();
-        btn.disabled = true;
-        btn.innerText = "Validando...";
-        statusDiv.style.display = "block";
-        statusDiv.style.background = "#fef3c7";
-        statusDiv.style.color = "#d97706";
-        statusDiv.innerText = "Calculando posición física actual...";
+        
+        if (localStorage.getItem("asistencia_enviada_dia") === obtenerFechaHoy()) {
+            bloquearFormularioPorFraude();
+            return;
+        }
 
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                const latAlumno = position.coords.latitude;
-                const lonAlumno = position.coords.longitude;
-                
-                const distancia = calcularDistancia(latAlumno, lonAlumno, ESCUELA_LAT, ESCUELA_LON);
-                
-                // CÓDIGO REAL: Sin el "|| true". Ahora el filtro es un muro.
-                if (distancia <= DISTANCIA_MAXIMA_METROS) {
-                    statusDiv.style.background = "#d1fae5";
-                    statusDiv.style.color = "#065f46";
-                    statusDiv.innerText = `Ubicación validada (Distancia: ${Math.round(distancia)} metros).\nTransmitiendo datos...`;
-                    conectarYEnviarMQTT();
-                } else {
-                    // Si estás en tu casa a 2203 metros, se va a disparar este bloqueo:
-                    statusDiv.style.background = "#fee2e2";
-                    statusDiv.style.color = "#dc2626";
-                    statusDiv.innerText = `Acceso Denegado: Debés estar en la institución para registrar asistencia. (Detectado a ${Math.round(distancia)} metros del aula).`;
-                    btn.disabled = false;
-                    btn.innerText = "Reintentar Envío";
-                }
-            },
-            function(error) {
-                // Si el GPS falla del todo o no hay permisos, en modo prueba igual intentamos mandar los datos
-                statusDiv.innerText = "Aviso: No se detectó ubicación, pero se procesará el envío de prueba...";
-                conectarYEnviarMQTT();
-            },
-            { 
-                enableHighAccuracy: true, 
-                timeout: 10000,             
-                maximumAge: 0              
-            }
-        );
+        btn.disabled = true;
+        btn.innerText = "Transmitiendo...";
+        conectarYEnviarMQTT();
     };
 
     function conectarYEnviarMQTT() {
@@ -246,12 +221,13 @@
             userName: usuario,
             password: contrasena,
             useSSL: true,
-            timeout: 7,
+            timeout: 5,
             onSuccess: onConnect,
             onFailure: function(err) {
+                statusDiv.style.display = "block";
                 statusDiv.style.background = "#fee2e2";
                 statusDiv.style.color = "#dc2626";
-                statusDiv.innerText = "Error MQTT: " + (err.errorMessage || "Fallo de conexión al bróker.");
+                statusDiv.innerText = "Error de red: No se pudo conectar con el servidor.";
                 btn.disabled = false;
                 btn.innerText = "Reintentar";
             }
@@ -261,14 +237,12 @@
     function onConnect() {
         const curso = selectCurso.value;
         const indiceAlumno = selectEstudiante.value;
-        const alumnoDatos = baseDatosCursos[curso][indiceAlumno];
-        
-        const nombre = alumnoDatos.nombre;
-        const dni = alumnoDatos.dni || "-"; 
-        const estado = document.getElementById("estado").value;
+        const nombre = baseDatosCursos[curso][indiceAlumno].nombre;
+        const estado = selectEstado.value;
         const ahora = new Date().toLocaleString();
 
-        const mensajeTexto = `${ahora}|${nombre} (${curso})|${dni}|${estado}`;
+        // Formato limpio de cadena de texto para tu receptor MQTT
+        const mensajeTexto = `${ahora}|${nombre} (${curso})|-|${estado}`;
         
         const message = new Paho.MQTT.Message(mensajeTexto);
         message.destinationName = topico;
@@ -276,18 +250,23 @@
         
         try {
             client.send(message);
+            localStorage.setItem("asistencia_enviada_dia", obtenerFechaHoy());
+            
+            document.getElementById("asistenciaForm").reset();
+            selectEstudiante.innerHTML = '<option value="" disabled selected>Primero seleccioná un curso...</option>';
+            
+            bloquearFormularioPorFraude();
+            statusDiv.innerText = "¡Asistencia registrada con éxito!";
             statusDiv.style.background = "#ecfdf5";
             statusDiv.style.color = "#059669";
-            statusDiv.innerText = "¡Asistencia registrada con éxito (Bypass)!";
-            document.getElementById("asistenciaForm").reset();
-            selectEstudiante.disabled = true;
-            selectEstudiante.innerHTML = '<option value="" disabled selected>Primero elegí el curso...</option>';
+            
         } catch (error) {
+            statusDiv.style.display = "block";
             statusDiv.innerText = "Error al despachar el paquete.";
             statusDiv.style.color = "#dc2626";
-        } finally {
-            btn.disabled = true;
+            btn.disabled = false;
             btn.innerText = "Enviar Registro";
+        } finally {
             client.disconnect();
         }
     }
