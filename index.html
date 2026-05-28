@@ -178,62 +178,48 @@
     };
 
 function validarUbicacionExpress() {
-        // Opción A: Intento ultra rápido por IP/Redes usando Geolocation API (Ideal para interiores)
-        fetch('https://www.googleapis.com/geolocation/v1/geolocate?key=ALERTA_DEBES_PONER_TU_KEY_AQUI', {
-            method: 'POST',
-            body: JSON.stringify({ considerIp: true }),
-            headers: { 'Content-Type': 'application/json' }
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data && data.location) {
-                procesarCoordenadas(data.location.lat, data.location.lng);
-            } else {
-                usarGpsNativoFallback();
-            }
-        })
-        .catch(() => {
-            // Si no hay internet estable o API Key, va al plan B automáticamente
-            usarGpsNativoFallback();
-        });
-    }
+        // Configuraciones para obligar al teléfono a buscar satélites reales sin usar antenas
+        const opcionesSatelitalesEstrictas = { 
+            enableHighAccuracy: true, // Fuerza el uso de GPS por hardware (satelital)
+            timeout: Infinity,        // NO se rinde por tiempo. Espera a que el chip conecte sí o sí
+            maximumAge: 0             // Prohibido usar ubicaciones viejas de antenas o IP
+        };
 
-    function procesarCoordenadas(lat, lon) {
-        const distancia = calcularDistancia(lat, lon, ESCUELA_LAT, ESCUELA_LON);
-        
-        if (distancia <= DISTANCIA_MAXIMA_METROS) {
-            // DENTRO DEL RANGO: Desbloqueo limpio e inmediato
-            selectCurso.disabled = false;
-            selectCurso.options[0].text = "Elegí tu curso...";
-            selectEstado.disabled = false;
-            statusDiv.style.display = "none";
-        } else {
-            // FUERA DEL RANGO
-            selectCurso.options[0].text = "Acceso bloqueado por GPS";
-            selectEstudiante.options[0].text = "Acceso bloqueado por GPS";
-            statusDiv.style.display = "block";
-            statusDiv.style.background = "#fee2e2";
-            statusDiv.style.color = "#dc2626";
-            statusDiv.innerText = `Acceso denegado: No te encontrás en el aula.\n(Detectado a ${Math.round(distancia)}m)`;
-        }
-    }
-
-    function usarGpsNativoFallback() {
-        // Plan B: El sistema clásico si falla el anterior, pero con tiempo límite estricto de 4 segundos
         navigator.geolocation.getCurrentPosition(
             function(position) {
-                procesarCoordenadas(position.coords.latitude, position.coords.longitude);
+                const latAlumno = position.coords.latitude;
+                const lonAlumno = position.coords.longitude;
+                const precision = position.coords.accuracy; // Margen de error real en metros
+                
+                const distancia = calcularDistancia(latAlumno, lonAlumno, ESCUELA_LAT, ESCUELA_LON);
+                
+                // Un margen de error menor a 150 metros garantiza que viene de un satélite o GPS real, no de una IP lejana
+                if (precision <= 150 && distancia <= DISTANCIA_MAXIMA_METROS) {
+                    // DENTRO DE RANGO SATELITAL REAL: Desbloqueo limpio
+                    selectCurso.disabled = false;
+                    selectCurso.options[0].text = "Elegí tu curso...";
+                    selectEstado.disabled = false;
+                    statusDiv.style.display = "none";
+                } else {
+                    // FUERA DE RANGO REAL O EN ANTENA ANTERIOR
+                    selectCurso.options[0].text = "Bloqueado por GPS";
+                    statusDiv.style.display = "block";
+                    statusDiv.style.background = "#fee2e2";
+                    statusDiv.style.color = "#dc2626";
+                    statusDiv.innerText = `Acceso denegado.\n• Distancia calculada por satélite: ${Math.round(distancia)}m.\n• Precisión del hardware: +/- ${Math.round(precision)}m.`;
+                }
             },
             function(error) {
-                selectCurso.options[0].text = "Error de ubicación";
+                selectCurso.options[0].text = "Error de GPS";
                 statusDiv.style.display = "block";
                 statusDiv.style.background = "#fee2e2";
                 statusDiv.style.color = "#dc2626";
-                statusDiv.innerText = "Error: Por favor, activa el GPS del dispositivo.";
+                statusDiv.innerText = "Error: El chip GPS no pudo conectar o se denegaron los permisos.";
             },
-            { enableHighAccuracy: false, timeout: 4000, maximumAge: 10000 }
+            opcionesSatelitalesEstrictas
         );
     }
+
 
     function bloquearFormularioPorFraude() {
         selectCurso.disabled = true;
