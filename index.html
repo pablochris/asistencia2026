@@ -149,7 +149,7 @@
         ]
     };
 
-    // 3. DATOS DE TU CONEXIÓN HIVEMQ CLOUD (Completar entre comillas)
+    // 3. DATOS DE TU CONEXIÓN HIVEMQ CLOUD (Reemplazá acá con tus datos reales)
     const broker = "d7c00be048ac4f408cd656bbb25ac141.s1.eu.hivemq.cloud"; 
     const usuario = "COLEGIO750";                                     
     const contrasena = "Presente26";                    
@@ -163,13 +163,13 @@
     const btn = document.getElementById("btnEnviar");
     const statusDiv = document.getElementById("status");
 
-    // OBTENER LA FECHA DE HOY (Formato AAAA-MM-DD) PARA TRABAJAR POR DÍA
+    // OBTENER LA FECHA DE HOY (Formato AAAA-MM-DD)
     function obtenerFechaHoy() {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
-    // CONTROL DE DISPOSITIVO: Bloquear al cargar la web si ya firmó hoy
+    // CONTROL DE DISPOSITIVO: Bloquear de entrada si ya firmó hoy
     window.onload = function() {
         const asistenciaHoy = localStorage.getItem("asistencia_enviada_dia");
         if (asistenciaHoy === obtenerFechaHoy()) {
@@ -220,7 +220,6 @@
     document.getElementById("asistenciaForm").onsubmit = function(e) {
         e.preventDefault();
         
-        // Verificación doble por si intentan saltearse el bloqueo visual
         if (localStorage.getItem("asistencia_enviada_dia") === obtenerFechaHoy()) {
             bloquearFormularioPorFraude();
             return;
@@ -300,15 +299,18 @@
         try {
             client.send(message);
             
-            // MARCA HISTÓRICA: Guardar en el dispositivo la fecha exacta del envío exitoso
+            // MARCA HISTÓRICA: Bloqueamos el dispositivo para el día de hoy
             localStorage.setItem("asistencia_enviada_dia", obtenerFechaHoy());
             
+            // Reestablecer la interfaz antes de trabarla por completo
+            document.getElementById("asistenciaForm").reset();
+            selectEstudiante.innerHTML = '<option value="" disabled selected>Primero elegí el curso...</option>';
+            
+            // Bloqueo inmediato en pantalla
+            bloquearFormularioPorFraude();
+            statusDiv.innerText = "¡Asistencia registrada con éxito!\nDispositivo bloqueado hasta mañana.";
             statusDiv.style.background = "#ecfdf5";
             statusDiv.style.color = "#059669";
-            statusDiv.innerText = "¡Asistencia registrada con éxito!";
-            
-            // Bloquear la pantalla inmediatamente para impedir segundos registros tácticos
-            bloquearFormularioPorFraude();
             
         } catch (error) {
             statusDiv.innerText = "Error al despachar el paquete.";
