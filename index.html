@@ -15,7 +15,7 @@
         select:focus { outline: none; border-color: var(--primary); background: #fff; }
         button { background: var(--primary); color: white; font-weight: bold; border: none; cursor: pointer; margin-top: 4px; }
         button:disabled { background: #94a3b8; cursor: not-allowed; }
-        #status { text-align: center; font-weight: 600; margin-top: 15px; font-size: 14px; color: #475569; padding: 10px; border-radius: 6px; display: none; line-height: 1.4; }
+        #status { text-align: center; font-weight: 600; margin-top: 15px; font-size: 14px; color: #475569; padding: 10px; border-radius: 6px; display: none; line-height: 1.4; white-space: pre-line; }
     </style>
 </head>
 <body>
@@ -24,8 +24,8 @@
     <h2>Asistencia</h2>
     <form id="asistenciaForm">
         <label>1. SELECCIONÁ TU CURSO</label>
-        <select id="curso" required>
-            <option value="" disabled selected>Elegí tu curso...</option>
+        <select id="curso" disabled required>
+            <option value="" disabled selected>Validando ubicación...</option>
             <option value="5° 2° CSH">5° 2° CSH</option>
             <option value="5° 2° EYA">5° 2° EYA</option>
             <option value="6° 2° CSH">6° 2° CSH</option>
@@ -34,11 +34,11 @@
 
         <label>2. APELLIDO Y NOMBRE</label>
         <select id="estudiante" disabled required>
-            <option value="" disabled selected>Primero elegí el curso...</option>
+            <option value="" disabled selected>Validando ubicación...</option>
         </select>
         
         <label>3. ESTADO</label>
-        <select id="estado">
+        <select id="estado" disabled>
             <option value="Presente">Presente</option>
             <option value="Ausente">Ausente</option>
         </select>
@@ -52,8 +52,8 @@
     // =================================================================
     // 1. CONFIGURACIÓN GEOGRÁFICA DE LA ESCUELA 
     // =================================================================
-    const ESCUELA_LAT = -42.748304;       
-    const ESCUELA_LON = -65.039397;       
+    const ESCUELA_LAT = -42.774371;       
+    const ESCUELA_LON = -65.042290;       
     const DISTANCIA_MAXIMA_METROS = 150; // Radio estricto de cobertura
 
     // =================================================================
@@ -149,7 +149,7 @@
         ]
     };
 
-    // 3. DATOS DE TU CONEXIÓN HIVEMQ CLOUD (Reemplazá acá con tus datos reales)
+    // 3. DATOS DE TU CONEXIÓN HIVEMQ CLOUD
     const broker = "d7c00be048ac4f408cd656bbb25ac141.s1.eu.hivemq.cloud"; 
     const usuario = "COLEGIO750";                                     
     const contrasena = "Presente26";                    
@@ -160,27 +160,86 @@
     const client = new Paho.MQTT.Client(broker, Number(puerto), "web_" + Math.random().toString(16).substr(2, 8));
     const selectCurso = document.getElementById("curso");
     const selectEstudiante = document.getElementById("estudiante");
+    const selectEstado = document.getElementById("estado");
     const btn = document.getElementById("btnEnviar");
     const statusDiv = document.getElementById("status");
 
-    // OBTENER LA FECHA DE HOY (Formato AAAA-MM-DD)
     function obtenerFechaHoy() {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
-    // CONTROL DE DISPOSITIVO: Bloquear de entrada si ya firmó hoy
+    // AL ENTRAR A LA PÁGINA: Ejecutamos el validador estricto de entrada
     window.onload = function() {
         const asistenciaHoy = localStorage.getItem("asistencia_enviada_dia");
         if (asistenciaHoy === obtenerFechaHoy()) {
             bloquearFormularioPorFraude();
+            return;
         }
+        
+        // Si no firmó hoy, iniciamos la verificación de GPS obligatoria para habilitar el formulario
+        verificarUbicacionAlEntrar();
     };
+
+    function verificarUbicacionAlEntrar() {
+        statusDiv.style.display = "block";
+        statusDiv.style.background = "#fef3c7";
+        statusDiv.style.color = "#d97706";
+        statusDiv.innerText = "Verificando presencia en el aula...\nBuscando señal de satélite.";
+
+        const watchId = navigator.geolocation.watchPosition(
+            function(position) {
+                const latAlumno = position.coords.latitude;
+                const lonAlumno = position.coords.longitude;
+                const precision = position.coords.accuracy;
+                
+                const distancia = calcularDistancia(latAlumno, lonAlumno, ESCUELA_LAT, ESCUELA_LON);
+                
+                // Si la antena da un error mayor a 2500m seguimos esperando calibración
+                if (precision > 2500) {
+                    statusDiv.innerText = `Sincronizando GPS...\nPrecisión actual: +/- ${Math.round(precision)}m`;
+                    return; 
+                }
+
+                // Fijamos la ubicación obtenida
+                navigator.geolocation.clearWatch(watchId);
+
+                if (distancia <= DISTANCIA_MAXIMA_METROS) {
+                    // ¡ESTÁ EN LA ESCUELA! Habilitamos el formulario por primera vez
+                    statusDiv.style.background = "#d1fae5";
+                    statusDiv.style.color = "#065f46";
+                    statusDiv.innerText = `Ubicación validada con éxito.\nYa podés registrar tu asistencia.`;
+                    
+                    // Activamos los componentes
+                    selectCurso.disabled = false;
+                    selectCurso.options[0].text = "Elegí tu curso...";
+                    selectEstado.disabled = false;
+                    // El botón y el estudiante se habilitan en cascada cuando elija el curso
+                } else {
+                    // FUERA DE RANGO: Queda todo bloqueado permanentemente
+                    statusDiv.style.background = "#fee2e2";
+                    statusDiv.style.color = "#dc2626";
+                    statusDiv.innerText = `Acceso Denegado: Debés estar en el establecimiento.\nDetectado a ${Math.round(distancia)} metros del aula.`;
+                    
+                    selectCurso.options[0].text = "Acceso bloqueado por GPS";
+                    selectEstudiante.options[0].text = "Acceso bloqueado por GPS";
+                }
+            },
+            function(error) {
+                navigator.geolocation.clearWatch(watchId);
+                statusDiv.style.background = "#fee2e2";
+                statusDiv.style.color = "#dc2626";
+                statusDiv.innerText = "Error: Es obligatorio activar el GPS y dar permisos para ingresar.";
+                selectCurso.options[0].text = "Falta permiso de ubicación";
+            },
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+    }
 
     function bloquearFormularioPorFraude() {
         selectCurso.disabled = true;
         selectEstudiante.disabled = true;
-        document.getElementById("estado").disabled = true;
+        selectEstado.disabled = true;
         btn.disabled = true;
         btn.innerText = "Envío Deshabilitado";
         statusDiv.style.display = "block";
@@ -189,7 +248,7 @@
         statusDiv.innerText = "Bloqueo de Seguridad: Desde este dispositivo ya se registró una asistencia el día de hoy.";
     }
 
-    // Lógica en cascada de estudiantes
+    // Lógica en cascada de estudiantes al elegir curso
     selectCurso.onchange = function() {
         const cursoSeleccionado = selectCurso.value;
         const alumnos = baseDatosCursos[cursoSeleccionado] || [];
@@ -204,7 +263,6 @@
         btn.disabled = false;
     };
 
-    // Fórmula Haversine matemática para medir distancias
     function calcularDistancia(lat1, lon1, lat2, lon2) {
         const R = 6371e3; 
         const phi1 = lat1 * Math.PI/180;
@@ -217,7 +275,7 @@
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-document.getElementById("asistenciaForm").onsubmit = function(e) {
+    document.getElementById("asistenciaForm").onsubmit = function(e) {
         e.preventDefault();
         
         if (localStorage.getItem("asistencia_enviada_dia") === obtenerFechaHoy()) {
@@ -226,57 +284,8 @@ document.getElementById("asistenciaForm").onsubmit = function(e) {
         }
 
         btn.disabled = true;
-        btn.innerText = "Calculando GPS...";
-        statusDiv.style.display = "block";
-        statusDiv.style.background = "#fef3c7";
-        statusDiv.style.color = "#d97706";
-        statusDiv.innerText = "Conectando con satélites... Esperando precisión óptima.";
-
-        // Usamos watchPosition para forzar el refresco del hardware del GPS
-        const watchId = navigator.geolocation.watchPosition(
-            function(position) {
-                const latAlumno = position.coords.latitude;
-                const lonAlumno = position.coords.longitude;
-                const precision = position.coords.accuracy; // Margen de error en metros
-                
-                const distancia = calcularDistancia(latAlumno, lonAlumno, ESCUELA_LAT, ESCUELA_LON);
-                
-                // Si la precisión es muy mala (mayor a 300m), esperamos al siguiente ciclo del chip
-                if (precision > 300) {
-                    statusDiv.innerText = `Ubicando... (Mejorando precisión actual: +/- ${Math.round(precision)}m)`;
-                    return; 
-                }
-
-                // Si ya tenemos buena precisión, frenamos el rastreador y evaluamos la distancia
-                navigator.geolocation.clearWatch(watchId);
-
-                if (distancia <= DISTANCIA_MAXIMA_METROS) {
-                    statusDiv.style.background = "#d1fae5";
-                    statusDiv.style.color = "#065f46";
-                    statusDiv.innerText = `Ubicación confirmada a ${Math.round(distancia)} metros. Transmitiendo...`;
-                    conectarYEnviarMQTT();
-                } else {
-                    statusDiv.style.background = "#fee2e2";
-                    statusDiv.style.color = "#dc2626";
-                    statusDiv.innerText = `Acceso Denegado: Debés estar en el lugar configurado. Detectado a ${Math.round(distancia)} metros.`;
-                    btn.disabled = false;
-                    btn.innerText = "Reintentar Envío";
-                }
-            },
-            function(error) {
-                navigator.geolocation.clearWatch(watchId);
-                statusDiv.style.background = "#fee2e2";
-                statusDiv.style.color = "#dc2626";
-                statusDiv.innerText = "Error obligatorio: Activa el GPS y concede permisos al navegador.";
-                btn.disabled = false;
-                btn.innerText = "Reintentar Envío";
-            },
-            { 
-                enableHighAccuracy: true, // Fuerza el uso de satélites GPS
-                timeout: 12000,           // Le damos 12 segundos de tiempo
-                maximumAge: 0             // Prohibido usar ubicaciones viejas guardadas
-            }
-        );
+        btn.innerText = "Transmitiendo...";
+        conectarYEnviarMQTT();
     };
 
     function conectarYEnviarMQTT() {
@@ -303,7 +312,7 @@ document.getElementById("asistenciaForm").onsubmit = function(e) {
         
         const nombre = alumnoDatos.nombre;
         const dni = alumnoDatos.dni || "-"; 
-        const estado = document.getElementById("estado").value;
+        const estado = selectEstado.value;
         const ahora = new Date().toLocaleString();
 
         const mensajeTexto = `${ahora}|${nombre} (${curso})|${dni}|${estado}`;
@@ -314,15 +323,11 @@ document.getElementById("asistenciaForm").onsubmit = function(e) {
         
         try {
             client.send(message);
-            
-            // MARCA HISTÓRICA: Bloqueamos el dispositivo para el día de hoy
             localStorage.setItem("asistencia_enviada_dia", obtenerFechaHoy());
             
-            // Reestablecer la interfaz antes de trabarla por completo
             document.getElementById("asistenciaForm").reset();
             selectEstudiante.innerHTML = '<option value="" disabled selected>Primero elegí el curso...</option>';
             
-            // Bloqueo inmediato en pantalla
             bloquearFormularioPorFraude();
             statusDiv.innerText = "¡Asistencia registrada con éxito!\nDispositivo bloqueado hasta mañana.";
             statusDiv.style.background = "#ecfdf5";
