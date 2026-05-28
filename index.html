@@ -196,7 +196,7 @@
                 const distancia = calcularDistancia(latAlumno, lonAlumno, ESCUELA_LAT, ESCUELA_LON);
                 
                 // Si la antena da un error mayor a 2500m seguimos esperando calibración
-                if (precision > 2500) {
+                if (precision > 10000) {
                     statusDiv.innerText = `Sincronizando GPS...\nPrecisión actual: +/- ${Math.round(precision)}m`;
                     return; 
                 }
