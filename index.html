@@ -54,7 +54,7 @@
     // =================================================================
     const ESCUELA_LAT = -42.76943;       // REEMPLAZÁ con la latitud exacta de tu colegio
     const ESCUELA_LON = -65.03812;       // REEMPLAZÁ con la longitud exacta de tu colegio
-    const DISTANCIA_MAXIMA_METROS = 800; // Tolerancia de rango a la redonda (ideal para antenas)
+    const DISTANCIA_MAXIMA_METROS = 150; // Tolerancia de rango a la redonda (ideal para antenas)
 
     // =================================================================
     // 2. REEMPLAZÁ ACÁ LAS LISTAS DE ALUMNOS CON TUS CURSOS REALES:
@@ -204,41 +204,36 @@
         statusDiv.style.display = "block";
         statusDiv.style.background = "#fef3c7";
         statusDiv.style.color = "#d97706";
-        statusDiv.innerText = "Comprobando asistencia presencial (Ubicación por red)...";
+        statusDiv.innerText = "Calculando posición física actual...";
 
-        // Solicitar ubicación express (sin encender antenas satelitales pesadas)
         navigator.geolocation.getCurrentPosition(
             function(position) {
                 const latAlumno = position.coords.latitude;
                 const lonAlumno = position.coords.longitude;
                 
-                // Medir distancia a la escuela
                 const distancia = calcularDistancia(latAlumno, lonAlumno, ESCUELA_LAT, ESCUELA_LON);
                 
-                if (distancia <= DISTANCIA_MAXIMA_METROS) {
-                    statusDiv.innerText = "Ubicación confirmada. Transmitiendo datos...";
+                // TRUCO DE PRUEBA (|| true): Fuerza al código a dejarte transmitir siempre
+                if (distancia <= DISTANCIA_MAXIMA_METROS || true) {
+                    statusDiv.innerText = `[Bypass de Prueba Activo]\nUbicación calculada: a ${Math.round(distancia)} metros.\nConectando y enviando por MQTT...`;
                     conectarYEnviarMQTT();
                 } else {
-                    // Bloqueo: El alumno está lejos de la institución
                     statusDiv.style.background = "#fee2e2";
                     statusDiv.style.color = "#dc2626";
-                    statusDiv.innerText = `Acceso denegado: Debes estar en el establecimiento escolar. (Detectado a ${Math.round(distancia/1000)} km).`;
+                    statusDiv.innerText = `Fuera de rango escolar. Detectado a ${Math.round(distancia)}m.`;
                     btn.disabled = false;
                     btn.innerText = "Reintentar Envío";
                 }
             },
             function(error) {
-                // Bloqueo: Ubicación apagada o permisos denegados
-                statusDiv.style.background = "#fee2e2";
-                statusDiv.style.color = "#dc2626";
-                statusDiv.innerText = "Error obligatorio: Activa los servicios de ubicación en tu celular para dar el presente.";
-                btn.disabled = false;
-                btn.innerText = "Reintentar Envío";
+                // Si el GPS falla del todo o no hay permisos, en modo prueba igual intentamos mandar los datos
+                statusDiv.innerText = "Aviso: No se detectó ubicación, pero se procesará el envío de prueba...";
+                conectarYEnviarMQTT();
             },
             { 
-                enableHighAccuracy: true, // OPTIMIZADO: Usa celdas de red/Wi-Fi cercanas (Instantáneo)
-                timeout: 5000,             // Margen de espera máximo de 5 segundos
-                maximumAge: 60000          // Acepta caché de ubicación de hasta 1 minuto
+                enableHighAccuracy: true, 
+                timeout: 5000,             
+                maximumAge: 0              
             }
         );
     };
@@ -253,7 +248,7 @@
             onFailure: function(err) {
                 statusDiv.style.background = "#fee2e2";
                 statusDiv.style.color = "#dc2626";
-                statusDiv.innerText = "Error: " + (err.errorMessage || "Fallo de red al conectar al bróker.");
+                statusDiv.innerText = "Error MQTT: " + (err.errorMessage || "Fallo de conexión al bróker.");
                 btn.disabled = false;
                 btn.innerText = "Reintentar";
             }
@@ -266,7 +261,7 @@
         const alumnoDatos = baseDatosCursos[curso][indiceAlumno];
         
         const nombre = alumnoDatos.nombre;
-        const dni = alumnoDatos.dni || "-"; // Envía guion si no tiene DNI cargado en la lista
+        const dni = alumnoDatos.dni || "-"; 
         const estado = document.getElementById("estado").value;
         const ahora = new Date().toLocaleString();
 
@@ -280,7 +275,7 @@
             client.send(message);
             statusDiv.style.background = "#ecfdf5";
             statusDiv.style.color = "#059669";
-            statusDiv.innerText = "¡Asistencia registrada con éxito en la escuela!";
+            statusDiv.innerText = "¡Asistencia registrada con éxito (Bypass)!";
             document.getElementById("asistenciaForm").reset();
             selectEstudiante.disabled = true;
             selectEstudiante.innerHTML = '<option value="" disabled selected>Primero elegí el curso...</option>';
