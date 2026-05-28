@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asistencia 750</title>
+    <title>Asistencia Dinámica Presencial</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
     <style>
         :root { --primary: #1a73e8; --bg: #f0f2f5; }
@@ -32,7 +32,7 @@
             <option value="6° 2° EYA">6° 2° EYA</option>
         </select>
 
-        <label>2. APELLIDO</label>
+        <label>2. APELLIDO Y NOMBRE</label>
         <select id="estudiante" disabled required>
             <option value="" disabled selected>Primero elegí el curso...</option>
         </select>
@@ -52,9 +52,9 @@
     // =================================================================
     // 1. CONFIGURACIÓN GEOGRÁFICA DE LA ESCUELA 
     // =================================================================
-    const ESCUELA_LAT = -42.748302;       // REEMPLAZÁ con la latitud exacta de tu colegio 774371
-    const ESCUELA_LON = -65.039268;       // REEMPLAZÁ con la longitud exacta de tu colegio 042290
-    const DISTANCIA_MAXIMA_METROS = 150; // Tolerancia de rango a la redonda (ideal para antenas)
+    const ESCUELA_LAT = -42.76943;       // REEMPLAZÁ con la latitud exacta de tu colegio
+    const ESCUELA_LON = -65.03812;       // REEMPLAZÁ con la longitud exacta de tu colegio
+    const DISTANCIA_MAXIMA_METROS = 800; // Tolerancia de rango a la redonda (ideal para antenas)
 
     // =================================================================
     // 2. REEMPLAZÁ ACÁ LAS LISTAS DE ALUMNOS CON TUS CURSOS REALES:
@@ -171,7 +171,7 @@
         const cursoSeleccionado = selectCurso.value;
         const alumnos = baseDatosCursos[cursoSeleccionado] || [];
         
-        selectEstudiante.innerHTML = '<option value="" disabled selected>Seleccioná tu apellido...</option>';
+        selectEstudiante.innerHTML = '<option value="" disabled selected>Seleccioná tu nombre...</option>';
         
         alumnos.forEach((alumno, indice) => {
             let opt = document.createElement("option");
@@ -280,7 +280,7 @@
             client.send(message);
             statusDiv.style.background = "#ecfdf5";
             statusDiv.style.color = "#059669";
-            statusDiv.innerText = "¡Asistencia registrada!";
+            statusDiv.innerText = "¡Asistencia registrada con éxito en la escuela!";
             document.getElementById("asistenciaForm").reset();
             selectEstudiante.disabled = true;
             selectEstudiante.innerHTML = '<option value="" disabled selected>Primero elegí el curso...</option>';
