@@ -217,7 +217,7 @@
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    document.getElementById("asistenciaForm").onsubmit = function(e) {
+document.getElementById("asistenciaForm").onsubmit = function(e) {
         e.preventDefault();
         
         if (localStorage.getItem("asistencia_enviada_dia") === obtenerFechaHoy()) {
@@ -226,40 +226,56 @@
         }
 
         btn.disabled = true;
-        btn.innerText = "Validando GPS...";
+        btn.innerText = "Calculando GPS...";
         statusDiv.style.display = "block";
         statusDiv.style.background = "#fef3c7";
         statusDiv.style.color = "#d97706";
-        statusDiv.innerText = "Verificando presencia física en el establecimiento...";
+        statusDiv.innerText = "Conectando con satélites... Esperando precisión óptima.";
 
-        navigator.geolocation.getCurrentPosition(
+        // Usamos watchPosition para forzar el refresco del hardware del GPS
+        const watchId = navigator.geolocation.watchPosition(
             function(position) {
                 const latAlumno = position.coords.latitude;
                 const lonAlumno = position.coords.longitude;
+                const precision = position.coords.accuracy; // Margen de error en metros
                 
                 const distancia = calcularDistancia(latAlumno, lonAlumno, ESCUELA_LAT, ESCUELA_LON);
                 
+                // Si la precisión es muy mala (mayor a 300m), esperamos al siguiente ciclo del chip
+                if (precision > 300) {
+                    statusDiv.innerText = `Ubicando... (Mejorando precisión actual: +/- ${Math.round(precision)}m)`;
+                    return; 
+                }
+
+                // Si ya tenemos buena precisión, frenamos el rastreador y evaluamos la distancia
+                navigator.geolocation.clearWatch(watchId);
+
                 if (distancia <= DISTANCIA_MAXIMA_METROS) {
                     statusDiv.style.background = "#d1fae5";
                     statusDiv.style.color = "#065f46";
-                    statusDiv.innerText = "Ubicación confirmada. Transmitiendo registro...";
+                    statusDiv.innerText = `Ubicación confirmada a ${Math.round(distancia)} metros. Transmitiendo...`;
                     conectarYEnviarMQTT();
                 } else {
                     statusDiv.style.background = "#fee2e2";
                     statusDiv.style.color = "#dc2626";
-                    statusDiv.innerText = `Acceso Denegado: Debés estar en la escuela. Detectado a ${Math.round(distancia)} metros del aula.`;
+                    statusDiv.innerText = `Acceso Denegado: Debés estar en el lugar configurado. Detectado a ${Math.round(distancia)} metros.`;
                     btn.disabled = false;
                     btn.innerText = "Reintentar Envío";
                 }
             },
             function(error) {
+                navigator.geolocation.clearWatch(watchId);
                 statusDiv.style.background = "#fee2e2";
                 statusDiv.style.color = "#dc2626";
                 statusDiv.innerText = "Error obligatorio: Activa el GPS y concede permisos al navegador.";
                 btn.disabled = false;
                 btn.innerText = "Reintentar Envío";
             },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            { 
+                enableHighAccuracy: true, // Fuerza el uso de satélites GPS
+                timeout: 12000,           // Le damos 12 segundos de tiempo
+                maximumAge: 0             // Prohibido usar ubicaciones viejas guardadas
+            }
         );
     };
 
